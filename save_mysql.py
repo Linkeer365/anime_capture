@@ -35,12 +35,12 @@ def get_packs(video_dir):
                 capture_time=pic.split(".")[0].rsplit("_",maxsplit=1)[-1]
                 img_path=f"{root}{os.sep}{pic}"
 
-                with open(img_path,"rb") as f:
-                    img=f.read()
+                # with open(img_path,"rb") as f:
+                #     img=f.read()
 
                 text="NN"
 
-                pack=(anime_name,episode_num,capture_time,img,text)
+                pack=(anime_name,episode_num,capture_time,img_path,text)
                 packs.append(pack)
 
                 print("Pack Add:",pack[0:3])
@@ -56,7 +56,7 @@ db_name="DB_Animes"
 db1 = mysql.connector.connect(
     host="localhost",       # 数据库主机地址
     user="root",    # 数据库用户名
-    passwd="xm111737",   # 数据库密码
+    passwd="cc",   # 数据库密码
     auth_plugin="mysql_native_password" # 8.0以上的版本需要使用插件！
 )
 
@@ -75,18 +75,18 @@ db1.close()
 
 
 
-db2 = pymysql.connect("localhost","root","xm111737",db_name)
+db2 = pymysql.connect("localhost","root","cc",db_name)
 print(db2)
 
 cursor2 = db2.cursor ()
 
 def add_table(table_name,anime_dir):
     table_name="Madoka"
-    create_fields_comm=f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, anime_name VARCHAR(255), episode_num VARCHAR(255), capture_time VARCHAR(255), img LONGBLOB NOT NULL, text VARCHAR(255))"
+    create_fields_comm=f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, anime_name VARCHAR(255), episode_num VARCHAR(255), capture_time VARCHAR(255), img_path VARCHAR(255), text VARCHAR(255))"
     # create table with fields
     cursor2.execute(create_fields_comm)
     # 注意id是不能insert的
-    insert_statement=f"INSERT INTO {table_name} (anime_name,episode_num,capture_time,img,text) VALUES (%s,%s,%s,%s,%s)"
+    insert_statement=f"INSERT INTO {table_name} (anime_name,episode_num,capture_time,img_path,text) VALUES (%s,%s,%s,%s,%s)"
     packs=get_packs(anime_dir)
     cursor2.executemany(insert_statement,packs)
     db2.commit()
