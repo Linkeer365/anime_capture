@@ -1,9 +1,19 @@
 import cv2
 import os
 
+import sys
+
 import mysql.connector
 
 import pymysql
+
+# 简繁转换...
+
+from zhconv import convert
+
+# print(convert("Python是一种动态的、面向对象的脚本语言","zh-hans"))
+
+# sys.exit(0)
 
 
 # video_path=r"D:\AllDowns\Madoka\[Madoka][01].mp4"
@@ -12,15 +22,29 @@ import pymysql
 #
 # capture_time_in_millisecond=20000
 
-# global variables
+# global variables(change if needed)
 
-video_dir=r"D:\AllDowns\Madoka"
+class Anime:
+    def __init__(self,video_dir,anime_name,video_suffix,cn_line_checkers,zimu_dir):
+        self.video_dir=video_dir
+        self.anime_name=anime_name
+        self.video_suffix=video_suffix
+        self.cn_line_checkers=cn_line_checkers
+        assert anime_name in video_dir
+        self.zimu_dir=zimu_dir
 
-anime_name="Madoka"
-video_suffix="mp4"
-
-assert anime_name in video_dir
-zimu_dir=r"D:\AllDowns\Madoka\Madoka_zimu"
+# video_dir=r"D:\AllDowns\Madoka"
+#
+# anime_name="Madoka"
+# video_suffix="mp4"
+#
+# cn_line_checkers=["CNsub","pos"]
+#
+# assert anime_name in video_dir
+#
+# zimu_dir=r"D:\AllDowns\Madoka\Madoka_zimu"
+#
+# table_name="Madoka"
 
 
 # db create
@@ -36,14 +60,17 @@ db1 = mysql.connector.connect(
 
 print(db1)
 
+# sys.exit(0)
+
 cursor1=db1.cursor()
 
 # create db
 try:
     cursor1.execute(f"CREATE DATABASE {db_name}")
 except mysql.connector.errors.DatabaseError:
-    cursor1.execute(f"DROP DATABASE {db_name}")
-    cursor1.execute(f"CREATE DATABASE {db_name}")
+    pass
+    # cursor1.execute(f"DROP DATABASE {db_name}")
+    # cursor1.execute(f"CREATE DATABASE {db_name}")
 
 db1.close()
 
@@ -106,17 +133,25 @@ def capture_at(vidcap,capture_dir,colon_start_time,colon_end_time):
         print("one cap failed!")
         return None,None
 
-def main():
+def fill_one_table(anime:Anime):
 
     # get time texts(zimu = 字幕)
+
+    zimu_dir=anime.zimu_dir
+    anime_name=anime.anime_name
+    video_dir=anime.video_dir
+    video_suffix=anime.video_suffix
+    cn_line_checkers=anime.cn_line_checkers
 
     packs=[]
 
     for zimu in os.listdir(zimu_dir):
-        assert zimu.endswith(".ass")
+        if not zimu.endswith(".ass"):
+            continue
+        # assert zimu.endswith(".ass")
         zimu_path=f"{zimu_dir}{os.sep}{zimu}"
 
-        episode_num=zimu.split(" ")[0]
+        episode_num=zimu.split(" ")[0].split(".ass")[0]
 
         with open(zimu_path,"r",encoding="utf-8") as f:
             zimu_lines=f.readlines()
@@ -131,12 +166,13 @@ def main():
         zimu_raw_path = f"{zimu_dir}{os.sep}raw_ep{episode_num}.txt"
 
         for line in zimu_lines:
-            if line.startswith("Dialogue:") and line.split(",")[3]=="CNsub":
+            if line.startswith("Dialogue:") and line.split(",")[3] in cn_line_checkers:
                 # 'Dialogue: 0', '0:11:04.51', '0:11:06.75', 'JPsub', 'NTP', '0', '0', '0', '', 'ねえ まどか あの子知り合い'
                 items=line.split(",")
                 colon_start_time,colon_end_time=items[1:3]
                 text=items[-1].strip("\n")
-                cn_pack=(colon_start_time,colon_end_time,text)
+                text_sim=convert(text,"zh-hans")
+                cn_pack=(colon_start_time,colon_end_time,text_sim)
                 cn_packs.append(cn_pack)
 
         print("cn pack:",cn_packs)
@@ -169,15 +205,22 @@ def main():
         packs.extend(new_cn_packs)
 
     print("packs",packs[0])
-    table_name="Madoka"
-    create_fields_comm=f"CREATE TABLE {table_name} (id INT AUTO_INCREMENT PRIMARY KEY, anime_name VARCHAR(255), episode_num VARCHAR(255), capture_time VARCHAR(255), img LONGBLOB NOT NULL, text VARCHAR(255))"
+
+    create_fields_comm=f"CREATE TABLE {anime_name} (id INT AUTO_INCREMENT PRIMARY KEY, anime_name VARCHAR(255), episode_num VARCHAR(255), capture_time VARCHAR(255), img VARCHAR (255), text VARCHAR(255))"
     # create table with fields
     cursor2.execute(create_fields_comm)
     # 注意id是不能insert的
-    insert_statement=f"INSERT INTO {table_name} (anime_name,episode_num,capture_time,img,text) VALUES (%s,%s,%s,%s,%s)"
+    insert_statement=f"INSERT INTO {anime_name} (anime_name,episode_num,capture_time,img,text) VALUES (%s,%s,%s,%s,%s)"
     cursor2.executemany(insert_statement,packs)
     db2.commit()
     print(cursor2.rowcount,"插入成功")
+
+def main():
+    madoka=Anime(video_dir=r"D:\AllDowns\Madoka",anime_name="Madoka",video_suffix="mp4",cn_line_checkers=["CNsub","pos"],zimu_dir=r"D:\AllDowns\Madoka\Madoka_zimu")
+    katanagatari=Anime(video_dir=r"D:\AllDowns\Katanagatari",anime_name="Katanagatari",video_suffix="rmvb",cn_line_checkers=['*Default','Comment'],zimu_dir=r"D:\AllDowns\Katanagatari\Katanagatari_zimu")
+
+    fill_one_table(madoka)
+    fill_one_table(katanagatari)
 
 if __name__ == '__main__':
     main()
